@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.meter_replace import MeterReplaceService
 from app.store import store
 
 MODULE = "meter_record"
@@ -11,8 +12,17 @@ STATUS_ORDER = ["正常", "待换表", "停走", "倒转", "缺电"]
 ACTION_RULES = {"现场抄表": "正常", "换表登记": "待换表", "恢复供电": "正常"}
 NEGATIVE_ACTIONS = []
 
+replace_service = MeterReplaceService()
+
 
 class MeterRecordService:
+    def _with_replace_ref(self, row: dict[str, Any]) -> dict[str, Any]:
+        """档案行附上当前生效的换表单编号；与结算明细共用同一份口径。"""
+        latest = replace_service.latest_effective_map().get(str(row.get("安装位置", "")).strip())
+        annotated = dict(row)
+        annotated["生效换表单"] = latest["id"] if latest else row.get("生效换表单")
+        return annotated
+
     def list_entries(
         self,
         *,
@@ -28,10 +38,12 @@ class MeterRecordService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        page_rows = [self._with_replace_ref(row) for row in rows[start:start + size]]
+        return page_rows, total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        row = store.find(MODULE, entry_id)
+        return self._with_replace_ref(row) if row is not None else None
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]

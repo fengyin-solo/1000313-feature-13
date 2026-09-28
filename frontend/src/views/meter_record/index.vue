@@ -3,10 +3,10 @@
     <header class="page-head">
       <div>
         <h2>水表管理管理</h2>
-        <p class="page-desc">维护贸易结算表，围绕表具编号、表具类型、口径规格、安装位置做登记、筛选与状态流转。</p>
+        <p class="page-desc">维护贸易结算表，围绕表具编号、表具类型、口径规格、安装位置做登记、筛选与状态流转；换表后的表号与示数以生效的换表记录为准，可在「换表记录」中核对。</p>
       </div>
       <div class="page-actions">
-        <button class="btn primary" type="button" @click="openCreate">登记贸易结算表</button>
+        <RouterLink class="btn primary" to="/meter_replace">登记换表记录</RouterLink>
         <button class="btn" type="button" @click="exportRows">导出水表管理清单</button>
       </div>
     </header>
@@ -64,13 +64,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { request } from '@/api/client'
 
 type Row = Record<string, string | number | null>
 
+const router = useRouter()
+
 const ENDPOINT = '/api/meter_record'
-const columns = ["表具编号", "表具类型", "口径规格", "安装位置", "上次示数", "当前示数", "抄表员", "表具状态"]
+const columns = ["表具编号", "表具类型", "口径规格", "安装位置", "上次示数", "当前示数", "生效换表单", "抄表员", "表具状态"]
 const actions = ["现场抄表", "换表登记", "恢复供电"]
 const statuses = ["正常", "待换表", "停走", "倒转", "缺电"]
 const stats = [{"label": "正常表具", "value": 0}, {"label": "异常表具", "value": 0}, {"label": "待换表具", "value": 0}]
@@ -90,12 +93,13 @@ function exportRows() {
   window.open(`${ENDPOINT}/export`, '_blank')
 }
 
-function openCreate() {
-  errorMessage.value = '贸易结算表登记入口尚未接入审批流'
-}
-
 async function runAction(action: string, row: Row) {
   errorMessage.value = ''
+  if (action === '换表登记') {
+    // 换表以换表单为准，引导到换表记录页登记并带上表号
+    void router.push({ path: '/meter_replace', query: { keyword: String(row['表具编号'] ?? '') } })
+    return
+  }
   try {
     const response = await request(`${ENDPOINT}/${row.id}/actions`, {
       method: 'POST',
