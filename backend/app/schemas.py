@@ -185,6 +185,23 @@ class MeterRecordEntry(BaseModel):
     field_6: str | None = None  # 抄表员
     field_7: str | None = None  # 表具状态
 
+class MeterReplaceEntry(BaseModel):
+    """贸易结算表换表记录明细结构。"""
+
+    field_0: str | None = None  # 换表编号
+    field_1: str | None = None  # 旧表编号
+    field_2: str | None = None  # 新表编号
+    field_3: str | None = None  # 表具类型
+    field_4: str | None = None  # 口径规格
+    field_5: str | None = None  # 安装位置
+    field_6: str | None = None  # 旧表止度
+    field_7: str | None = None  # 新表起度
+    field_8: str | None = None  # 换表原因
+    field_9: str | None = None  # 施工时间
+    field_10: str | None = None  # 复核时间
+    field_11: str | None = None  # 施工人员
+    field_12: str | None = None  # 核对状态
+
 class HydrantEntry(BaseModel):
     """消防栓明细结构。"""
 

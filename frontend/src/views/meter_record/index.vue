@@ -2,12 +2,12 @@
   <section class="page" data-module="meter_record">
     <header class="page-head">
       <div>
-        <h2>水表管理管理</h2>
-        <p class="page-desc">维护贸易结算表，围绕表具编号、表具类型、口径规格、安装位置做登记、筛选与状态流转。</p>
+        <h2>水表档案</h2>
+        <p class="page-desc">维护贸易结算表档案，围绕表具编号、表具类型、口径规格、安装位置做登记、筛选与状态流转；换表生效后档案与换表记录、结算明细同步更新。</p>
       </div>
       <div class="page-actions">
-        <button class="btn primary" type="button" @click="openCreate">登记贸易结算表</button>
-        <button class="btn" type="button" @click="exportRows">导出水表管理清单</button>
+        <RouterLink class="btn primary" type="button" to="/meter_replace">换表记录</RouterLink>
+        <button class="btn" type="button" @click="exportRows">导出水表档案清单</button>
       </div>
     </header>
 
@@ -23,6 +23,13 @@
         <span>{{ field }}</span>
         <input v-model="filters[field]" :placeholder="`按${field}检索`" />
       </label>
+      <label class="filter-item">
+        <span>表具状态</span>
+        <select v-model="statusFilter">
+          <option value="">全部</option>
+          <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+        </select>
+      </label>
       <button class="btn" type="submit">查询</button>
       <button class="btn ghost" type="button" @click="resetFilters">重置条件</button>
     </form>
@@ -36,7 +43,15 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">
+            <template v-if="column === '最近换表'">
+              <RouterLink v-if="row['最近换表']" class="link" :to="`/meter_replace?focus=${row['最近换表']}`">
+                {{ row['最近换表'] }}
+              </RouterLink>
+              <span v-else class="muted-text">—</span>
+            </template>
+            <template v-else>{{ row[column] ?? '—' }}</template>
+          </td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -47,16 +62,17 @@
             >
               {{ action }}
             </button>
+            <RouterLink class="link" :to="`/meter_replace?oldMeter=${encodeURIComponent(String(row['表具编号'] ?? ''))}`">发起换表</RouterLink>
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 1" class="empty-state">暂无水表管理数据，可先登记贸易结算表</td>
+          <td :colspan="columns.length + 1" class="empty-state">暂无水表档案数据</td>
         </tr>
       </tbody>
     </table>
 
     <footer class="page-foot">
-      <span>共 {{ total }} 条水表管理记录</span>
+      <span>共 {{ total }} 条水表档案记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -70,8 +86,8 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/meter_record'
-const columns = ["表具编号", "表具类型", "口径规格", "安装位置", "上次示数", "当前示数", "抄表员", "表具状态"]
-const actions = ["现场抄表", "换表登记", "恢复供电"]
+const columns = ["表具编号", "表具类型", "口径规格", "安装位置", "上次示数", "当前示数", "抄表员", "表具状态", "最近换表"]
+const actions = ["现场抄表", "恢复供电"]
 const statuses = ["正常", "待换表", "停走", "倒转", "缺电"]
 const stats = [{"label": "正常表具", "value": 0}, {"label": "异常表具", "value": 0}, {"label": "待换表具", "value": 0}]
 
@@ -79,19 +95,17 @@ const rows = ref<Row[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
+const statusFilter = ref('')
 const filterFields = columns.slice(0, 3)
 
 function resetFilters() {
   filters.value = {}
+  statusFilter.value = ''
   void reload()
 }
 
 function exportRows() {
   window.open(`${ENDPOINT}/export`, '_blank')
-}
-
-function openCreate() {
-  errorMessage.value = '贸易结算表登记入口尚未接入审批流'
 }
 
 async function runAction(action: string, row: Row) {
@@ -102,27 +116,28 @@ async function runAction(action: string, row: Row) {
       body: JSON.stringify({ action }),
     })
     if (!response.ok) {
-      throw new Error('水表管理动作未生效，请稍后重试')
+      throw new Error('水表档案动作未生效，请稍后重试')
     }
     await reload()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '水表管理操作失败'
+    errorMessage.value = error instanceof Error ? error.message : '水表档案操作失败'
   }
 }
 
 async function reload() {
   errorMessage.value = ''
-  const query = new URLSearchParams(filters.value as Record<string, string>).toString()
+  const query = new URLSearchParams(filters.value as Record<string, string>)
+  if (statusFilter.value) query.set('status', statusFilter.value)
   try {
-    const response = await request(`${ENDPOINT}?${query}`)
+    const response = await request(`${ENDPOINT}?${query.toString()}`)
     if (!response.ok) {
-      throw new Error('贸易结算表列表读取失败')
+      throw new Error('水表档案列表读取失败')
     }
     const payload = await response.json()
     rows.value = payload.items ?? []
     total.value = payload.total ?? rows.value.length
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '水表管理列表读取失败'
+    errorMessage.value = error instanceof Error ? error.message : '水表档案列表读取失败'
   }
 }
 
